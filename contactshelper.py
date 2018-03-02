@@ -1,4 +1,5 @@
 import httplib2
+import os
 
 from googleapiclient.discovery import build
 from oauth2client.file import Storage
@@ -42,9 +43,9 @@ def authorize_app(client_id, client_secret, scope, user_agent='managing-contacts
     return http
 
 
-def get_contacts_list(service, fields):
+def get_contacts_list(service, fields, pageSize=2000):
     results = service.people().connections().list(resourceName=RESOURCE_NAME,
-        personFields=fields).execute()
+        personFields=fields, pageSize=pageSize).execute()
     connections = results.get(CONNECTIONS, [])
     return connections
 
@@ -83,20 +84,39 @@ def enumerate_contacts(contacts, firstdigit, charsize):
     firstdigit = str(firstdigit)
     for contact in contacts:
         # firstdigit + number of 0s needed to fill charsize + index
-        newname = firstdigit + (charsize-lendigits(index)-1)*'0' + str(index)
+        code = firstdigit + (charsize-lendigits(index)-1)*'0' + str(index)
+        parts = contact.name.split()
+        # if not parts:
+            # print(contact)
+            # print("----------")
+            # print(repr(contact))
+            # exit()
+        parts[0] = code
+        newname = "".join(parts)
         contact.name = newname
+        index = index+1
 
     return contacts
 
+def work_and_enumerate(contacts, charsize):
+    reenumerated = []
+    for i in range(6):
+        current = [c for c in contacts if c.name.startswith(str(i))]
+        current = enumerate_contacts(contacts, i, charsize)
+        reenumerated.extend(current)
 
-CLIENT_ID=''
-CLIENT_SECRET=''
+    return reenumerated
+
+
+
+CLIENT_ID= os.environ['CLIENT_ID']
+CLIENT_SECRET= os.environ['CLIENT_SECRET']
 SCOPE='https://www.googleapis.com/auth/contacts'
 
 if __name__ == '__main__':
     http = authorize_app(CLIENT_ID, CLIENT_SECRET,SCOPE)
     people_service = build(serviceName='people', version='v1', http=http)
-    contacts_list = get_contacts_list(people_service, 'names,emailAddresses,phoneNumbers')
+    contacts_list = get_contacts_list(people_service, 'names,emailAddresses,phoneNumbers', pageSize=200)
 
     groups_list = get_groups_list(people_service)
 
@@ -105,18 +125,37 @@ if __name__ == '__main__':
         contact = WappContact(person)
         contacts.append(contact)
 
-    contact_groups = []
-    for group_data in groups_list:
-        contact_groups.append(ContactGroup(group_data))
-
-    # pass Marden to "Pessoal" group
-    personal_group = [g for g in contact_groups if g.name()=="Pessoal"][0]
-    marden = [p.resource_name() for p in contacts if p.name()=="Marden Rodrigues"][0]
-
-    modify_group(people_service, personal_group, contacts_add=[marden])
-
     for i in range(len(contacts)):
-        print(i, contacts[i])
-    print("---------------------------")
-    for i in range(len(contact_groups)):
-        print(i, contact_groups[i])
+        if not contacts[i].phone_number:
+            print(i, contacts[i])
+            print(repr(contacts[i]))
+            print("------------------")
+
+    #
+    #
+    #
+    #
+    # contact_groups = []
+    # for group_data in groups_list:
+    #     contact_groups.append(ContactGroup(group_data))
+    #
+    # # pass Marden to "Pessoal" group
+    # supporters_group = [g for g in contact_groups if g.name()=="Apoiadores"][0]
+    # # marden = [p.resource_name() for p in contacts if p.name()=="Marden Rodrigues"][0]
+    #
+    # # modify_group(people_service, supporters_group, contacts_add=[marden])
+    #
+    # contacts = work_and_enumerate(contacts, 6)
+    # current_index = 0
+    # found = False
+    # for i in range(len(contacts)):
+    #     newindex = contacts[i].name[0]
+    #     if newindex.isdigit():
+    #         found = True
+    #     if newindex != current_index:
+    #         print("---------------------------")
+    #         current_index = newindex
+    #     print(i, contacts[i])
+
+    # for i in range(len(contact_groups)):
+    #     print(i, contact_groups[i])
