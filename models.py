@@ -1,4 +1,4 @@
-
+from utils import phone_canonicalform
 
 NAMES = 'names'
 DISPLAYNAME = 'displayName'
@@ -21,11 +21,28 @@ class WappContact:
             except(KeyError, IndexError):
                 self._email = ""
             try:
-                self._phone_number = datadict[PHONENUMBERS][0][CANONICALFORM]
-            except(KeyError, IndexError):
+                #need to find a canonicalForm field
+                phone_index = 0
+                alternative_value = ""
+                alternative_index = 0
+                for numberdict in datadict[PHONENUMBERS]: #check all numbers
+                    self._phone_number = numberdict.get(CANONICALFORM, "")
+                    if self._phone_number: #found a canonicalForm field
+                        self._phone_index = phone_index
+                        break
+                    if not alternative_value or not alternative_value.startswith('+'):
+                        alternative_value = numberdict.get("value", "")
+                        alternative_index = phone_index
+                    phone_index = phone_index + 1
+
+                if not self._phone_number:
+                    self._phone_number = phone_canonicalform(alternative_value)
+                    self._phone_index = alternative_index
+            except(KeyError, IndexError, ValueError):
                 self._phone_number = ""
         else:
             self._name = self._email = self._phone_number = ""
+            self._phone_index = 0
 
     def builddata(wappcontact):
         # print("builddata")
@@ -100,28 +117,10 @@ class WappContact:
         self._phone_number = value
         #TODO: update data representation
 
-        if self.data.get(NAMES, []):
-            self.data[PHONENUMBERS][0][CANONICALFORM] = value
+        if self.data.get(PHONENUMBERS, []):
+            self.data[PHONENUMBERS][self._phone_index][CANONICALFORM] = value
         else:
-            self.data[NAMES] = [{CANONICALFORM: value}]
-
-    # #TODO: make property
-    # def name(self):
-    #     """Returns the displayName of the name field"""
-    #
-    #     return self.data.get(NAMES)[0].get(DISPLAYNAME)
-    #
-    # def email(self):
-    #     """ Returns the displayName of the email field"""
-    #     if not self.data.get(EMAILS, []):
-    #         return ""
-    #     return self.data.get(EMAILS)[0].get(DISPLAYNAME, "")
-    #
-    # def phone_number(self):
-    #     """Returns phone number canonical form"""
-    #     if not self.data.get(PHONENUMBERS, []):
-    #         return ""
-    #     return self.data.get(PHONENUMBERS)[0].get(CANONICALFORM, "")
+            self.data[PHONENUMBERS] = [{CANONICALFORM: value}]
 
     def resource_name(self):
         """Returns object resource name"""
@@ -135,6 +134,12 @@ class WappContact:
 
     def __repr__(self):
         return str(self.data)
+
+    def __lt__(self, rhs):
+        return self.name < rhs.name
+
+    def __le__(self, rhs):
+        return self.name <= rhs.name
 
 
 class ContactGroup:

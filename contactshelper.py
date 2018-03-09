@@ -61,7 +61,7 @@ def create_contact(service, wappcontact):
 def modify_contact(service, wappcontact, update_person_fields):
     results = service.people().updateContact(
             resourceName=wappcontact.resource_name(),
-            body=repr(wappcontact),
+            body=wappcontact.data,
             updatePersonFields=update_person_fields).execute()
     return results
 
@@ -86,24 +86,19 @@ def enumerate_contacts(contacts, firstdigit, charsize):
         # firstdigit + number of 0s needed to fill charsize + index
         code = firstdigit + (charsize-lendigits(index)-1)*'0' + str(index)
         parts = contact.name.split()
-        # if not parts:
-            # print(contact)
-            # print("----------")
-            # print(repr(contact))
-            # exit()
         parts[0] = code
-        newname = "".join(parts)
+        newname = " ".join(parts)
         contact.name = newname
         index = index+1
 
     return contacts
 
-def work_and_enumerate(contacts, charsize):
+def work_and_enumerate(contacts, charsize=6):
     reenumerated = []
     for i in range(6):
         current = [c for c in contacts if c.name.startswith(str(i))]
-        current = enumerate_contacts(contacts, i, charsize)
-        reenumerated.extend(current)
+        if current:
+            reenumerated.append(enumerate_contacts(current, i, charsize))
 
     return reenumerated
 
@@ -116,20 +111,33 @@ SCOPE='https://www.googleapis.com/auth/contacts'
 if __name__ == '__main__':
     http = authorize_app(CLIENT_ID, CLIENT_SECRET,SCOPE)
     people_service = build(serviceName='people', version='v1', http=http)
-    contacts_list = get_contacts_list(people_service, 'names,emailAddresses,phoneNumbers', pageSize=200)
+    contacts_list = get_contacts_list(people_service, 'names,emailAddresses,phoneNumbers', pageSize=2000)
 
     groups_list = get_groups_list(people_service)
 
     contacts = []
     for person in contacts_list:
         contact = WappContact(person)
-        contacts.append(contact)
+        if contact.name[0].isdigit():
+            contacts.append(contact)
 
-    for i in range(len(contacts)):
-        if not contacts[i].phone_number:
-            print(i, contacts[i])
-            print(repr(contacts[i]))
-            print("------------------")
+    for contact in contacts:
+        if "Claudia" in contact.name:
+            print(contact)
+            print(repr(contact))
+
+    # print(len(contacts), 'NUMBERS')
+    # sorted(contacts)
+    # reenumerateds = work_and_enumerate(contacts)
+    #
+    # for contacts in reenumerateds:
+    #     for i in range(len(contacts)):
+    #         # if not contacts[i].phone_number:
+    #         print(i, contacts[i], 'MOD')
+    #         print(repr(contacts[i]))
+    #         modify_contact(people_service, contacts[i], 'names,phoneNumbers')
+    #             # print(repr(contacts[i]))
+    #     print("------------------------------")
 
     #
     #
