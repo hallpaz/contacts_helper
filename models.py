@@ -2,44 +2,48 @@ from utils import phone_canonicalform
 
 NAMES = 'names'
 DISPLAYNAME = 'displayName'
+GIVENNAME = 'givenName'
+MIDDLENAME = 'middleName'
+FAMILYNAME = 'familyName'
 EMAILS = 'emailAddresses'
 PHONENUMBERS = 'phoneNumbers'
 CANONICALFORM = 'canonicalForm'
 RESOURCENAME = 'resourceName'
+VALUE = "value"
 
 class WappContact:
 
     def extractdata(self, datadict):
         # print("extractdata")
         if datadict:
-            try:
-                self._name = datadict[NAMES][0][DISPLAYNAME]
-            except(KeyError, IndexError):
-                self._name = ""
-            try:
-                self._email = datadict[EMAILS][0][DISPLAYNAME]
-            except(KeyError, IndexError):
+            # try:
+            #     self._name = datadict[NAMES][0][DISPLAYNAME]
+            # except(KeyError, IndexError):
+            #     self._name = ""
+            if datadict.get(NAMES, ""):
+                # self._name = datadict[NAMES][0].get(DISPLAYNAME, "")
+                self._given_name = datadict[NAMES][0].get(GIVENNAME, "")
+                middlename = datadict[NAMES][0].get(MIDDLENAME, "")
+                if middlename:
+                    middlename = middlename + " "
+                self._family_name = middlename + datadict[NAMES][0].get(FAMILYNAME, "")
+            else:
+                self._name = self._given_name = self._family_name = ""
+            if datadict.get(EMAILS, ""):
+                self._email = datadict[EMAILS][0].get(DISPLAYNAME, "")
+            else:
                 self._email = ""
-            try:
-                #need to find a canonicalForm field
-                phone_index = 0
-                alternative_value = ""
-                alternative_index = 0
-                for numberdict in datadict[PHONENUMBERS]: #check all numbers
-                    self._phone_number = numberdict.get(CANONICALFORM, "")
-                    if self._phone_number: #found a canonicalForm field
-                        self._phone_index = phone_index
-                        break
-                    if not alternative_value or not alternative_value.startswith('+'):
-                        alternative_value = numberdict.get("value", "")
-                        alternative_index = phone_index
-                    phone_index = phone_index + 1
-
-                if not self._phone_number:
-                    self._phone_number = phone_canonicalform(alternative_value)
-                    self._phone_index = alternative_index
-            except(KeyError, IndexError, ValueError):
+            if datadict.get(PHONENUMBERS, ""):
                 self._phone_number = ""
+                index = 0
+                while not self._phone_number and index < len(datadict[PHONENUMBERS]):
+                    self._phone_number = phone_canonicalform(
+                            datadict[PHONENUMBERS][0].get(VALUE, ""))
+                    self._phone_index = index
+                    index = index + 1
+            else:
+                self._phone_number = ""
+
         else:
             self._name = self._email = self._phone_number = ""
             self._phone_index = 0
@@ -79,17 +83,47 @@ class WappContact:
     @property
     def name(self):
         # print("name getter")
-        return self._name
+        return "{} {}".format(self.given_name, self.family_name)
 
-    @name.setter
-    def name(self, value):
+    # @name.setter
+    # def name(self, value):
+    #     # print("name setter")
+    #     self._name = value
+    #     #update representation
+    #     if self.data.get(NAMES, []):
+    #         self.data[NAMES][0][DISPLAYNAME] = value
+    #     else:
+    #         self.data[NAMES] = [{DISPLAYNAME: value}]
+
+    @property
+    def given_name(self):
+        # print("name getter")
+        return self._given_name
+
+    @given_name.setter
+    def given_name(self, value):
         # print("name setter")
-        self._name = value
+        self._given_name = value
         #update representation
         if self.data.get(NAMES, []):
-            self.data[NAMES][0][DISPLAYNAME] = value
+            self.data[NAMES][0][GIVENNAME] = value
         else:
-            self.data[NAMES] = [{DISPLAYNAME: value}]
+            self.data[NAMES] = [{GIVENNAME: value}]
+
+    @property
+    def family_name(self):
+        # print("name getter")
+        return self._family_name
+
+    @family_name.setter
+    def family_name(self, value):
+        # print("name setter")
+        self._family_name = value
+        #update representation
+        if self.data.get(NAMES, []):
+            self.data[NAMES][0][FAMILYNAME] = value
+        else:
+            self.data[NAMES] = [{FAMILYNAME: value}]
 
     @property
     def email(self):
@@ -100,7 +134,7 @@ class WappContact:
     def email(self, value):
         # print("email setter")
         self._email = value
-        #TODO update data representation
+
         if self.data.get(EMAILS, []):
             self.data[EMAILS][0][DISPLAYNAME] = value
         else:
@@ -115,12 +149,11 @@ class WappContact:
     def phone_number(self, value):
         # print("phone setter")
         self._phone_number = value
-        #TODO: update data representation
 
         if self.data.get(PHONENUMBERS, []):
-            self.data[PHONENUMBERS][self._phone_index][CANONICALFORM] = value
+            self.data[PHONENUMBERS][self._phone_index][VALUE] = value
         else:
-            self.data[PHONENUMBERS] = [{CANONICALFORM: value}]
+            self.data[PHONENUMBERS] = [{VALUE: value}]
 
     def resource_name(self):
         """Returns object resource name"""
